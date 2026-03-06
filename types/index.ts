@@ -9,23 +9,24 @@ export interface MaterialsData {
   materials: string
 }
 
-/** Response from POST /webhook/bpcuisines-render/start */
+/** Response from POST /api/render/start */
 export interface StartRenderResponse {
   id: string
-  status: 'pending' | 'processing' | 'succeeded' | 'failed'
-  /** Set immediately when the backend finishes synchronously */
-  outputUrl?: string
+  status: 'processing' | 'succeeded' | 'failed'
+  outputUrl: string | null
   /** Explicit poll endpoint provided by the backend */
   pollUrl?: string
-  error?: string
+  error: string | null
 }
 
-/** Response from GET /webhook/bpcuisines-render/status?id=… */
+/** Response from GET /api/render/status?id=... */
 export interface RenderJobResponse {
   id: string
-  status: 'pending' | 'processing' | 'succeeded' | 'failed'
-  outputUrl?: string
-  error?: string
+  status: 'processing' | 'succeeded' | 'failed' | 'not_found'
+  outputUrl: string | null
+  error: string | null
+  progress: number | null
+  updatedAt: string | null
 }
 
 export interface HistoryItem {

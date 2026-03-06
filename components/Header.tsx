@@ -1,21 +1,35 @@
+import Link from 'next/link'
+
 export default function Header() {
   return (
-    <header className="bg-[#0A0A0A] text-white">
-      <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-9 h-9 border border-[#C5A35E] flex items-center justify-center shrink-0">
-            <span className="text-[#C5A35E] text-[10px] font-bold tracking-widest">BP</span>
+    <header className="h-20 bg-white border-b border-[#EEEEEE] sticky top-0 z-40">
+      <div className="max-w-[1280px] mx-auto h-full px-6 sm:px-10 flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-3 shrink-0">
+          <div className="w-10 h-10 bg-[#E30613] flex items-center justify-center rounded-sm shrink-0">
+            <span className="text-white text-[11px] font-bold tracking-widest">BP</span>
           </div>
-          <div>
-            <p className="text-sm font-semibold tracking-wide leading-tight">BP Cuisine</p>
-            <p className="text-[#C5A35E] text-[10px] tracking-[0.25em] uppercase leading-tight mt-0.5">
-              Render Studio
-            </p>
-          </div>
-        </div>
+          <span className="text-[#111111] font-semibold text-[15px] tracking-tight hidden sm:block">
+            BP Cuisines
+          </span>
+        </Link>
 
-        <span className="text-[10px] text-neutral-600 tracking-[0.2em] uppercase hidden sm:block">
-          Internal Tool
+        <nav className="flex items-center gap-3">
+          <Link
+            href="/studio"
+            className="rounded-full border border-[#e3d9cb] px-4 py-2 text-xs font-semibold text-[#201d1e] hover:border-[#c9b6a1]"
+          >
+            Studio 3D
+          </Link>
+          <Link
+            href="/"
+            className="rounded-full border border-[#e3d9cb] px-4 py-2 text-xs font-semibold text-[#201d1e] hover:border-[#c9b6a1]"
+          >
+            Render IA legacy
+          </Link>
+        </nav>
+
+        <span className="hidden sm:block text-[11px] text-[#AAAAAA] tracking-[0.15em] uppercase shrink-0">
+          Powered by Nexaia
         </span>
       </div>
     </header>

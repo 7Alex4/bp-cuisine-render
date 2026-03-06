@@ -22,94 +22,98 @@ interface Props {
 }
 
 const labelClass =
-  'block text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-2'
+  'block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#999999] mb-2'
 const inputClass =
-  'w-full bg-white border border-neutral-200 rounded-sm px-4 py-3 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-[#C5A35E] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+  'w-full bg-[#FAFAFA] border border-[#E8E8E8] rounded-[10px] px-4 py-3 text-sm text-[#1A1A1A] placeholder-[#BBBBBB] focus:outline-none focus:border-[#E30613] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 const dimInputClass =
-  'flex-1 bg-white border border-neutral-200 rounded-sm px-3 py-3 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-[#C5A35E] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center'
+  'flex-1 bg-[#FAFAFA] border border-[#E8E8E8] rounded-[10px] px-3 py-3 text-sm text-[#1A1A1A] placeholder-[#BBBBBB] focus:outline-none focus:border-[#E30613] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center'
 
 export default function MaterialsForm({ data, onChange, disabled = false }: Props) {
-  const update = (key: keyof MaterialsData, value: string) =>
-    onChange({ ...data, [key]: value })
+  const update = (key: keyof MaterialsData, value: string) => onChange({ ...data, [key]: value })
 
   return (
     <div className="space-y-5">
       <div>
-        <label className={labelClass}>Design Prompt</label>
+        <label className={labelClass}>Description du projet</label>
         <textarea
           value={data.prompt}
-          onChange={(e) => update('prompt', e.target.value)}
+          onChange={(event) => update('prompt', event.target.value)}
           disabled={disabled}
-          placeholder="Describe the kitchen you envision — layout, atmosphere, key elements, client preferences…"
+          placeholder="Decrivez la cuisine souhaitee : ambiance, implantation, ilot, circulation, elements cles, preferences du client..."
           rows={4}
           className={`${inputClass} resize-none`}
         />
       </div>
 
       <div>
-        <label className={labelClass}>Kitchen Style</label>
+        <label className={labelClass}>Style de cuisine</label>
         <select
           value={data.style}
-          onChange={(e) => update('style', e.target.value)}
+          onChange={(event) => update('style', event.target.value)}
           disabled={disabled}
           className={inputClass}
         >
-          <option value="">Select a style…</option>
-          {STYLE_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
+          <option value="">Selectionnez un style...</option>
+          {STYLE_OPTIONS.map((style) => (
+            <option key={style} value={style}>
+              {style}
             </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label className={labelClass}>Room Dimensions (m)</label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={data.width}
-            onChange={(e) => update('width', e.target.value)}
-            disabled={disabled}
-            placeholder="W"
-            className={dimInputClass}
-          />
-          <span className="text-neutral-300 text-sm select-none">×</span>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={data.depth}
-            onChange={(e) => update('depth', e.target.value)}
-            disabled={disabled}
-            placeholder="D"
-            className={dimInputClass}
-          />
-          <span className="text-neutral-300 text-sm select-none">×</span>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={data.height}
-            onChange={(e) => update('height', e.target.value)}
-            disabled={disabled}
-            placeholder="H"
-            className={dimInputClass}
-          />
-          <span className="text-[11px] text-neutral-400 shrink-0 ml-1">m</span>
+        <label className={labelClass}>Dimensions de la piece (m)</label>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={data.width}
+              onChange={(event) => update('width', event.target.value)}
+              disabled={disabled}
+              placeholder="L (m)"
+              className={dimInputClass}
+            />
+            <p className="text-[10px] text-[#AAAAAA] mt-1 text-center">Longueur</p>
+          </div>
+          <div>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={data.depth}
+              onChange={(event) => update('depth', event.target.value)}
+              disabled={disabled}
+              placeholder="P (m)"
+              className={dimInputClass}
+            />
+            <p className="text-[10px] text-[#AAAAAA] mt-1 text-center">Profondeur</p>
+          </div>
+          <div>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={data.height}
+              onChange={(event) => update('height', event.target.value)}
+              disabled={disabled}
+              placeholder="H (m)"
+              className={dimInputClass}
+            />
+            <p className="text-[10px] text-[#AAAAAA] mt-1 text-center">Hauteur</p>
+          </div>
         </div>
-        <p className="text-[11px] text-neutral-400 mt-1.5">Width × Depth × Height</p>
       </div>
 
       <div>
-        <label className={labelClass}>Materials & Finishes</label>
+        <label className={labelClass}>Materiaux et finitions</label>
         <textarea
           value={data.materials}
-          onChange={(e) => update('materials', e.target.value)}
+          onChange={(event) => update('materials', event.target.value)}
           disabled={disabled}
-          placeholder="e.g. matte white lacquer cabinets, Calacatta marble countertop, brushed brass hardware, integrated Miele appliances…"
+          placeholder="ex. facades laque blanc mat, plan de travail marbre Calacatta, robinetterie laiton brosse, appareils integres..."
           rows={3}
           className={`${inputClass} resize-none`}
         />

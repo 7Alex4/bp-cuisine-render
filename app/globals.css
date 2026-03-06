@@ -1,15 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F5F4F1;
+  --background: #ffffff;
   --foreground: #1A1A1A;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bp-red: #E30613;
+  --color-bp-black: #111111;
+  --color-bp-grey: #F5F5F5;
+  --color-bp-text: #1A1A1A;
+  /* System font stack that closely approximates Inter on all major platforms:
+     Win11 = Segoe UI Variable, macOS/iOS = SF Pro, Linux = system-ui.
+     Falls back to the user-installed Inter if available. */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
 }
 
 body {

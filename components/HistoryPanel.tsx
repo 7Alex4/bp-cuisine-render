@@ -20,37 +20,35 @@ export default function HistoryPanel({ items, onClear, onSelect }: Props) {
   if (items.length === 0) return null
 
   return (
-    <div className="mt-12 pt-8 border-t border-neutral-200">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-          Recent Renders
-        </h2>
+    <div className="mt-14 pt-8 border-t border-[#EEEEEE]">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-base font-semibold text-[#1A1A1A]">Rendus precedents</h2>
         <button
           onClick={onClear}
-          className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+          className="text-xs text-[#AAAAAA] hover:text-[#E30613] transition-colors"
         >
-          Clear history
+          Effacer l&apos;historique
         </button>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide">
         {items.map((item) => (
           <button
             key={item.id}
             onClick={() => onSelect(item)}
-            className="flex-shrink-0 w-36 text-left group"
+            className="flex-shrink-0 w-40 text-left group"
           >
-            <div className="relative w-36 h-24 bg-neutral-100 rounded-sm overflow-hidden">
+            <div className="relative w-40 h-28 bg-[#F5F5F5] rounded-[14px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] transition-shadow duration-200">
               {item.imageUrl ? (
                 <img
                   src={item.imageUrl}
-                  alt="Past render"
+                  alt="Rendu precedent"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <svg
-                    className="text-neutral-300"
+                    className="text-[#CCCCCC]"
                     width="20"
                     height="20"
                     viewBox="0 0 24 24"
@@ -65,14 +63,14 @@ export default function HistoryPanel({ items, onClear, onSelect }: Props) {
                 </div>
               )}
               <div
-                className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
+                className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
                   item.status === 'succeeded' ? 'bg-emerald-400' : 'bg-red-400'
                 }`}
               />
             </div>
-            <p className="text-[11px] text-neutral-400 mt-1.5">{formatDate(item.createdAt)}</p>
-            <p className="text-xs text-neutral-700 font-medium truncate">
-              {item.style || 'No style'}
+            <p className="text-[11px] text-[#AAAAAA] mt-2">{formatDate(item.createdAt)}</p>
+            <p className="text-xs text-[#1A1A1A] font-medium truncate mt-0.5">
+              {item.style || 'Sans style'}
             </p>
           </button>
         ))}

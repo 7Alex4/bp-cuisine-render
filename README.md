@@ -129,6 +129,41 @@ Returns the current status of a render job.
 
 ---
 
+## How to Verify Front-Back Connection
+
+Use the **Dev — Connection Debug** panel (visible only in `npm run dev`, hidden in production) to confirm end-to-end wiring before a real shoot.
+
+### Steps
+
+1. **Start the dev server**
+   ```bash
+   npm run dev
+   # open http://localhost:3000
+   ```
+
+2. **Verify the base URL**
+   Scroll to the bottom of the page and expand the amber "Dev — Connection Debug" panel.
+   The **n8n Base URL** row should show your instance origin (e.g. `https://my-n8n.example.com`).
+   If it shows `(not set)`, create `.env.local` from `.env.local.example` and restart.
+
+3. **Ping an existing render ID**
+   In the **Ping Status** row, enter any ID that exists in your n8n Executions log and click **Ping Status**.
+   Expected response shape:
+   ```json
+   { "_http": 200, "id": "...", "status": "succeeded", "outputUrl": "https://..." }
+   ```
+   A `_http: 404` or `_error` means the webhook path or n8n activation is wrong.
+
+4. **Start Test Job**
+   Upload both images and fill in at least the prompt, then click **Start Test Job**.
+   The raw JSON from `/start` is printed immediately — look for `id` and `status`.
+   Check the **n8n → Executions** tab to confirm the workflow was triggered and all six fields arrived (`room`, `sketch`, `prompt`, `style`, `dimensions`, `materials`).
+
+5. **Full round-trip**
+   Use the normal Generate button. The progress bar will appear, and the result image will be displayed once `outputUrl` is returned.
+
+---
+
 ## Project Structure
 
 ```

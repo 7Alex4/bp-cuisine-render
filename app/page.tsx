@@ -1,22 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import DebugPanel from '@/components/DebugPanel'
 import Header from '@/components/Header'
-import UploadZone from '@/components/UploadZone'
 import MaterialsForm from '@/components/MaterialsForm'
-import ProgressSection from '@/components/ProgressSection'
-import ResultViewer from '@/components/ResultViewer'
-import HistoryPanel from '@/components/HistoryPanel'
-import { startRender, pollRender } from '@/lib/api'
-import { addToHistory, clearHistory, getHistory } from '@/lib/history'
-import type { HistoryItem, MaterialsData, RenderStatus } from '@/types'
-
-// ── Polling constants ─────────────────────────────────────────────────────────
-const POLL_BASE_MS = 4_000
-const POLL_SLOW_INTERVAL_MS = 10_000
-const POLL_MAX_BACKOFF_MS = 30_000
-const POLL_MAX_NET_ERRORS = 3   // give up after 3 consecutive network errors
-const POLL_SLOW_AFTER_MS = 3 * 60 * 1_000  // switch to slow poll after 3 min
+import UploadZone from '@/components/UploadZone'
+import { startRender } from '@/lib/api'
+import { prepareRoomImage, prepareSketchImage } from '@/lib/client/image-processing'
+import { parseLocaleNumber } from '@/lib/inputs'
+import type { MaterialsData } from '@/types'
 
 const DEFAULT_MATERIALS: MaterialsData = {
   prompt: '',
@@ -27,373 +20,268 @@ const DEFAULT_MATERIALS: MaterialsData = {
   materials: '',
 }
 
-export default function Dashboard() {
+export default function ConfigPage() {
+  const router = useRouter()
   const [roomImage, setRoomImage] = useState<File | null>(null)
   const [sketchImage, setSketchImage] = useState<File | null>(null)
   const [materials, setMaterials] = useState<MaterialsData>(DEFAULT_MATERIALS)
-  const [status, setStatus] = useState<RenderStatus>('idle')
-  const [renderId, setRenderId] = useState<string | null>(null)
-  const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [pendingPreparations, setPendingPreparations] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | undefined>()
-  const [history, setHistory] = useState<HistoryItem[]>([])
-  const [isSlowPoll, setIsSlowPoll] = useState(false)
-
-  // Single timer for the next scheduled poll tick
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Soft timeout — switches to slow poll mode after 3 min
-  const globalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Cancels any in-flight fetch (upload OR poll)
   const abortRef = useRef<AbortController | null>(null)
-  // Ref mirror of isSlowPoll to avoid stale closures in scheduleTick
-  const slowRef = useRef(false)
-  const resultRef = useRef<HTMLDivElement>(null)
+  const isPreparingFiles = pendingPreparations > 0
 
-  useEffect(() => {
-    setHistory(getHistory())
-    return () => stopAll()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const canGenerate = !!roomImage && !!sketchImage && !isUploading && !isPreparingFiles
 
-  /** Cancel everything in flight, clear all timers, reset slow-poll state. */
-  function stopAll() {
-    if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null }
-    if (globalTimerRef.current) { clearTimeout(globalTimerRef.current); globalTimerRef.current = null }
-    abortRef.current?.abort()
-    abortRef.current = null
-    slowRef.current = false
-    setIsSlowPoll(false)
-  }
-
-  /**
-   * Recursive, backoff-aware polling loop.
-   *
-   * - Each successful HTTP response (any job status) resets the error counter.
-   * - Each network error doubles the delay (4 s → 8 s → 16 s).
-   * - After POLL_MAX_NET_ERRORS consecutive network errors the render is marked failed.
-   * - An AbortError (user cancel / unmount) exits silently.
-   */
-  function beginPolling(id: string, snap: MaterialsData, pollUrl?: string) {
-    function saveAndRefresh(st: 'succeeded' | 'failed', imageUrl?: string) {
-      addToHistory({
-        id,
-        createdAt: new Date().toISOString(),
-        status: st,
-        imageUrl,
-        prompt: snap.prompt,
-        style: snap.style,
-      })
-      setHistory(getHistory())
-    }
-
-    function scheduleTick(delayMs: number, netErrors: number) {
-      pollTimerRef.current = setTimeout(async () => {
-        // Grab the signal that was current when this tick was scheduled.
-        // If stopAll() was called before we fired, abortRef is null → we bail.
-        const signal = abortRef.current?.signal
-        if (!signal || signal.aborted) return
-
-        try {
-          const job = await pollRender(id, signal, pollUrl)
-
-          if (job.status === 'succeeded') {
-            stopAll()
-            setStatus('succeeded')
-            setResultUrl(job.outputUrl ?? null)
-            saveAndRefresh('succeeded', job.outputUrl)
-            setTimeout(
-              () => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-              100,
-            )
-          } else if (job.status === 'failed') {
-            stopAll()
-            setStatus('failed')
-            setErrorMsg(job.error ?? 'The render failed. Please check your inputs and try again.')
-            saveAndRefresh('failed')
-          } else {
-            // 'pending' | 'processing' → still running; schedule next tick
-            const base = slowRef.current ? POLL_SLOW_INTERVAL_MS : POLL_BASE_MS
-            scheduleTick(base, 0)
-          }
-        } catch (err) {
-          if (err instanceof DOMException && err.name === 'AbortError') return
-
-          const nextErrors = netErrors + 1
-          if (nextErrors >= POLL_MAX_NET_ERRORS) {
-            stopAll()
-            setStatus('failed')
-            setErrorMsg(
-              err instanceof Error
-                ? `Network error: ${err.message}`
-                : 'Lost connection while checking render status.',
-            )
-            return
-          }
-          // Exponential backoff, capped; respect slow-poll base
-          const base = slowRef.current ? POLL_SLOW_INTERVAL_MS : POLL_BASE_MS
-          const backoff = Math.min(base * 2 ** nextErrors, POLL_MAX_BACKOFF_MS)
-          scheduleTick(backoff, nextErrors)
-        }
-      }, delayMs)
-    }
-
-    // Soft timeout — switch to slow-poll mode; user can still cancel
-    globalTimerRef.current = setTimeout(() => {
-      slowRef.current = true
-      setIsSlowPoll(true)
-    }, POLL_SLOW_AFTER_MS)
-
-    scheduleTick(POLL_BASE_MS, 0)
+  function appendSharedFields(formData: FormData) {
+    formData.append('prompt', materials.prompt)
+    formData.append('style', materials.style)
+    formData.append(
+      'dimensions',
+      JSON.stringify({
+        width: parseLocaleNumber(materials.width),
+        depth: parseLocaleNumber(materials.depth),
+        height: parseLocaleNumber(materials.height),
+      }),
+    )
+    formData.append('materials', JSON.stringify({ description: materials.materials }))
   }
 
   async function handleGenerate() {
-    if (!roomImage || !sketchImage) return
-    if (status === 'uploading' || status === 'processing') return
+    if (!canGenerate) return
 
-    stopAll()
-
-    // Fresh controller for this entire job (upload + all poll ticks share it)
+    abortRef.current?.abort()
     abortRef.current = new AbortController()
     const { signal } = abortRef.current
 
-    setStatus('uploading')
+    setIsUploading(true)
     setErrorMsg(undefined)
-    setResultUrl(null)
-    setRenderId(null)
 
-    const fd = new FormData()
-    fd.append('room', roomImage)
-    fd.append('sketch', sketchImage)
-    fd.append('prompt', materials.prompt)
-    fd.append('style', materials.style)
-    fd.append('dimensions', JSON.stringify({
-      width: parseFloat(materials.width) || 0,
-      depth: parseFloat(materials.depth) || 0,
-      height: parseFloat(materials.height) || 0,
-    }))
-    fd.append('materials', JSON.stringify({ description: materials.materials }))
+    const formData = new FormData()
+    formData.append('room', roomImage!)
+    formData.append('sketch', sketchImage!)
+    appendSharedFields(formData)
 
     try {
-      const start = await startRender(fd, signal)
-      setRenderId(start.id)
+      const start = await startRender(formData, signal)
 
-      // Backend may return an immediate terminal state (rare but valid)
-      if (start.status === 'succeeded') {
-        setStatus('succeeded')
-        setResultUrl(start.outputUrl ?? null)
-        addToHistory({
-          id: start.id,
-          createdAt: new Date().toISOString(),
-          status: 'succeeded',
-          imageUrl: start.outputUrl,
-          prompt: materials.prompt,
-          style: materials.style,
-        })
-        setHistory(getHistory())
-        abortRef.current = null
+      if (!start?.id || !start?.status) {
+        setErrorMsg(
+          `Reponse inattendue du serveur - attendu {id, status}. Recu : ${JSON.stringify(start)}`,
+        )
+        setIsUploading(false)
         return
       }
 
-      if (start.status === 'failed') {
-        setStatus('failed')
-        setErrorMsg(start.error ?? 'Render failed immediately. Please try again.')
-        addToHistory({
-          id: start.id,
-          createdAt: new Date().toISOString(),
-          status: 'failed',
-          prompt: materials.prompt,
-          style: materials.style,
-        })
-        setHistory(getHistory())
-        abortRef.current = null
-        return
-      }
-
-      // 'pending' | 'processing' → enter polling loop
-      setStatus('processing')
-      beginPolling(start.id, materials, start.pollUrl)
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      setStatus('failed')
+      router.push(`/result/${start.id}`)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
       setErrorMsg(
-        err instanceof Error ? err.message : 'Failed to start render. Check your connection.',
+        error instanceof Error
+          ? error.message
+          : 'Echec du demarrage du rendu. Verifiez votre connexion.',
       )
+      setIsUploading(false)
     }
   }
 
-  /** User-initiated cancel during upload or polling. */
   function handleCancel() {
-    stopAll()
-    setStatus('idle')
+    abortRef.current?.abort()
+    abortRef.current = null
+    setIsUploading(false)
     setErrorMsg(undefined)
   }
 
-  function handleRegenerate() {
-    stopAll()
-    setStatus('idle')
-    setResultUrl(null)
-    setRenderId(null)
-    setErrorMsg(undefined)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  async function handleRoomFile(nextFile: File | null) {
+    if (!nextFile) {
+      setRoomImage(null)
+      return
+    }
+
+    setPendingPreparations((value) => value + 1)
+    try {
+      setRoomImage(await prepareRoomImage(nextFile))
+    } catch (error) {
+      console.error('[page] room preprocessing failed, using original file:', error)
+      setRoomImage(nextFile)
+    } finally {
+      setPendingPreparations((value) => value - 1)
+    }
   }
 
-  function handleHistorySelect(item: HistoryItem) {
-    if (!item.imageUrl) return
-    setResultUrl(item.imageUrl)
-    setRenderId(item.id)
-    setStatus('succeeded')
-    setTimeout(
-      () => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-      50,
-    )
+  async function handleSketchFile(nextFile: File | null) {
+    if (!nextFile) {
+      setSketchImage(null)
+      return
+    }
+
+    setPendingPreparations((value) => value + 1)
+    try {
+      setSketchImage(await prepareSketchImage(nextFile))
+    } catch (error) {
+      console.error('[page] sketch preprocessing failed, using original file:', error)
+      setSketchImage(nextFile)
+    } finally {
+      setPendingPreparations((value) => value - 1)
+    }
   }
 
-  function handleClearHistory() {
-    clearHistory()
-    setHistory([])
-  }
+  async function debugStartTest(): Promise<unknown> {
+    if (!roomImage || !sketchImage) {
+      return { _error: 'Upload both the room image and the sketch before running the test.' }
+    }
 
-  const isBusy = status === 'uploading' || status === 'processing'
-  const canGenerate = !!roomImage && !!sketchImage && !isBusy
+    const formData = new FormData()
+    formData.append('room', roomImage)
+    formData.append('sketch', sketchImage)
+    appendSharedFields(formData)
+
+    try {
+      const res = await fetch('/api/render/start', {
+        method: 'POST',
+        body: formData,
+        cache: 'no-store',
+      })
+      const body = await res.json().catch(async () => ({
+        _raw: await res.text().catch(() => '(unreadable)'),
+      }))
+      return { _http: res.status, ...(body && typeof body === 'object' ? body : { _body: body }) }
+    } catch (error) {
+      return { _error: String(error) }
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-[#F5F4F1]">
+    <div className="min-h-screen bg-[#F5F5F5]">
       <Header />
 
-      <main className="max-w-4xl mx-auto px-5 sm:px-6 py-10 pb-24">
-        {/* Page heading */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-light tracking-tight text-[#1A1A1A]">New Render</h2>
-          <p className="text-sm text-neutral-500 mt-1">
-            Upload your room photo and floor sketch, then describe the kitchen you envision.
+      <main className="max-w-[900px] mx-auto px-5 sm:px-8 py-12 pb-24">
+        <div className="mb-10 text-center">
+          <h1 className="text-[28px] font-bold text-[#1A1A1A] leading-tight">
+            Creer un rendu cuisine
+          </h1>
+          <p className="text-sm text-[#777777] mt-2">
+            Importez la photo de la piece et un croquis 2D pour guider le rendu.
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* ── Upload row ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 mb-2">
-                Room Photo
-              </p>
-              <UploadZone
-                label="Empty kitchen space"
-                sublabel="JPG or PNG · up to 20 MB"
-                icon={<RoomIcon />}
-                capture="environment"
-                file={roomImage}
-                onFile={setRoomImage}
-                disabled={isBusy}
-              />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 mb-2">
-                2D Sketch
-              </p>
-              <UploadZone
-                label="Floor plan or hand drawing"
-                sublabel="JPG or PNG · up to 20 MB"
-                icon={<SketchIcon />}
-                capture="environment"
-                file={sketchImage}
-                onFile={setSketchImage}
-                disabled={isBusy}
-              />
+        <div className="space-y-8">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#999999] mb-3">
+              Fichiers source
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#999999] mb-2">
+                  Photo de la piece
+                </p>
+                <UploadZone
+                  label="Espace cuisine vide"
+                  sublabel="JPG ou PNG - 20 Mo max - rotation corrigee automatiquement"
+                  icon={<RoomIcon />}
+                  capture="environment"
+                  file={roomImage}
+                  onFile={handleRoomFile}
+                  disabled={isUploading || isPreparingFiles}
+                />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#999999] mb-2">
+                  Croquis 2D
+                </p>
+                <UploadZone
+                  label="Plan ou dessin a main levee"
+                  sublabel="Requis - nettoye en noir et blanc pour mieux guider l'implantation"
+                  icon={<SketchIcon />}
+                  capture="environment"
+                  file={sketchImage}
+                  onFile={handleSketchFile}
+                  disabled={isUploading || isPreparingFiles}
+                />
+              </div>
             </div>
           </div>
 
-          {/* ── Design specifications ── */}
-          <div className="bg-white rounded-sm border border-neutral-100 px-6 py-6">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 mb-5">
-              Design Specifications
+          <div className="bg-white rounded-[20px] shadow-[0_10px_30px_rgba(0,0,0,0.07)] px-6 py-6">
+            <h3 className="text-[18px] font-semibold text-[#1A1A1A] mb-6">
+              Configuration de la cuisine
             </h3>
-            <MaterialsForm data={materials} onChange={setMaterials} disabled={isBusy} />
+            <MaterialsForm data={materials} onChange={setMaterials} disabled={isUploading} />
           </div>
 
-          {/* ── Upload hint ── */}
-          {(!roomImage || !sketchImage) && status === 'idle' && (
-            <div className="flex items-center gap-2 text-xs text-neutral-400">
-              <InfoIcon />
-              {!roomImage && !sketchImage
-                ? 'Upload a room photo and a 2D sketch to get started.'
-                : !roomImage
-                  ? 'A room photo is still required.'
-                  : 'A 2D sketch is still required.'}
+          {errorMsg && (
+            <div className="rounded-[10px] bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {errorMsg}
             </div>
           )}
 
-          {/* ── Generate / Cancel buttons ── */}
-          <div className="flex items-center justify-end gap-3">
-            {isBusy && (
+          {!roomImage && !sketchImage && !isUploading && !errorMsg && (
+            <p className="text-xs text-[#AAAAAA] text-center">
+              Importez une photo de la piece et un croquis 2D pour commencer.
+            </p>
+          )}
+
+          {isPreparingFiles && !isUploading && !errorMsg && (
+            <p className="text-xs text-[#AAAAAA] text-center">
+              Preparation des images en cours...
+            </p>
+          )}
+
+          {roomImage && !sketchImage && !isUploading && !isPreparingFiles && !errorMsg && (
+            <p className="text-xs text-[#AAAAAA] text-center">
+              Le croquis 2D est maintenant requis pour contraindre la geometrie du rendu.
+            </p>
+          )}
+
+          <div className="flex items-center justify-center gap-3">
+            {isUploading && (
               <button
                 onClick={handleCancel}
-                className="px-5 py-3 text-sm font-medium text-neutral-500 border border-neutral-200 rounded-sm hover:border-neutral-400 hover:text-neutral-700 transition-colors"
+                className="px-5 py-3 text-sm font-medium text-[#666666] border border-[#E0E0E0] bg-white rounded-[14px] hover:border-[#AAAAAA] hover:text-[#333333] transition-colors"
               >
-                Cancel
+                Annuler
               </button>
             )}
             <button
               onClick={handleGenerate}
               disabled={!canGenerate}
               className={[
-                'px-8 py-3 text-sm font-semibold tracking-wide rounded-sm transition-all duration-200',
+                'px-10 py-3.5 text-sm font-semibold rounded-[14px] transition-all duration-200',
                 canGenerate
-                  ? 'bg-[#0A0A0A] text-white hover:bg-neutral-800 active:scale-[0.98]'
-                  : 'bg-neutral-200 text-neutral-400 cursor-not-allowed',
+                  ? 'bg-[#E30613] text-white hover:bg-[#c60511] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(227,6,19,0.25)] active:scale-[0.98]'
+                  : 'bg-[#F0F0F0] text-[#AAAAAA] cursor-not-allowed',
               ].join(' ')}
             >
-              {isBusy ? (
+              {isUploading ? (
                 <span className="flex items-center gap-2">
                   <SpinnerIcon />
-                  Rendering…
+                  Envoi en cours...
+                </span>
+              ) : isPreparingFiles ? (
+                <span className="flex items-center gap-2">
+                  <SpinnerIcon />
+                  Preparation des images...
                 </span>
               ) : (
-                'Generate 4K Render'
+                'Generer le rendu'
               )}
             </button>
           </div>
-
-          {/* ── Progress ── */}
-          {status !== 'idle' && (
-            <div className="transition-all duration-300">
-              <ProgressSection status={status} error={errorMsg} slowPoll={isSlowPoll} />
-            </div>
-          )}
-
-          {/* ── Result ── */}
-          {status === 'succeeded' && resultUrl && renderId && (
-            <div ref={resultRef}>
-              <ResultViewer
-                imageUrl={resultUrl}
-                renderId={renderId}
-                onRegenerate={handleRegenerate}
-              />
-            </div>
-          )}
         </div>
 
-        {/* ── History ── */}
-        <HistoryPanel
-          items={history}
-          onClear={handleClearHistory}
-          onSelect={handleHistorySelect}
-        />
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="mt-12">
+            <DebugPanel onStartTest={debugStartTest} />
+          </div>
+        )}
       </main>
     </div>
   )
 }
 
-// ── Inline SVG icons ─────────────────────────────────────────────────────────
-
 function RoomIcon() {
   return (
-    <svg
-      width="36"
-      height="36"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-    >
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
       <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
       <path d="M9 21V13h6v8" />
     </svg>
@@ -402,14 +290,7 @@ function RoomIcon() {
 
 function SketchIcon() {
   return (
-    <svg
-      width="36"
-      height="36"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-    >
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
       <rect x="3" y="3" width="18" height="18" rx="1" />
       <path d="M7 7h2v2H7zM7 13h2v2H7z" />
       <path d="M12 7h5M12 10h5M12 13h5M12 16h5" />
@@ -420,33 +301,8 @@ function SketchIcon() {
 
 function SpinnerIcon() {
   return (
-    <svg
-      className="animate-spin"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-    >
+    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-    </svg>
-  )
-}
-
-function InfoIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
   )
 }
