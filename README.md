@@ -1,195 +1,117 @@
-# BP Cuisine — Render Studio
+# BP Cuisine Render Studio
 
-Internal AI-powered 4K kitchen visualisation tool for BP Cuisine design consultants.
+BP Cuisine Render Studio is a Next.js application with two product paths:
 
----
+- `/` for the legacy AI render flow backed by Supabase and Replicate
+- `/studio` for the new deterministic kitchen planning flow: parametric 2D scene, three.js preview, and Blender final render
 
-## Tech Stack
+## Stack
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 16 (App Router) |
+| App | Next.js 16 App Router |
 | Language | TypeScript |
 | Styling | Tailwind CSS v4 |
-| Backend | n8n webhook (external) |
-| Storage | `localStorage` (render history) |
-
----
+| Legacy render backend | Next.js API routes + Supabase + Replicate |
+| Studio pipeline | Parametric scene compiler + three.js + Blender |
+| Local studio persistence | `.data/studio` |
 
 ## Setup
 
-### 1. Install dependencies
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment
+2. Create `.env.local`
 
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local` and set your n8n base URL:
+Required for the legacy IA route:
 
 ```env
-NEXT_PUBLIC_N8N_BASE_URL=https://your-n8n-instance.example.com
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_STORAGE_BUCKET=renders
+REPLICATE_API_TOKEN=...
 ```
 
-### 3. Run development server
+Required for local final renders from `/studio`:
+
+```env
+BLENDER_PATH=C:\Program Files\Blender Foundation\Blender 5.0\blender.exe
+```
+
+3. Start development
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open:
 
----
+- `http://localhost:3000/` for the legacy IA flow
+- `http://localhost:3000/studio` for the parametric studio
 
-## Quickstart Checklist
+## Current Product Paths
 
-- [ ] Copy `.env.local.example` to `.env.local` and set `NEXT_PUBLIC_N8N_BASE_URL`
-- [ ] Run `npm install` then `npm run dev`
-- [ ] Open [http://localhost:3000](http://localhost:3000)
-- [ ] In n8n, activate the two webhooks below and verify they return the expected JSON shape
+### Legacy IA Flow
 
----
+The legacy route:
 
-## n8n Webhook API Contract
+- uploads the room image and sketch to Supabase Storage
+- starts a Replicate prediction through `/api/render/start`
+- polls `/api/render/status`
+- stores render job metadata in `render_jobs`
 
-The app expects two endpoints on your n8n instance:
+This path still works, but its fidelity is inherently weaker than the studio pipeline because it depends on image generation rather than deterministic geometry.
 
-### `POST /webhook/bpcuisines-render/start`
+### Studio Pipeline
 
-Starts a new render job. Accepts `multipart/form-data`:
+The `/studio` route uses a canonical parametric scene:
 
-| Field | Type | Description |
-|---|---|---|
-| `room` | File | Photo of the empty kitchen space |
-| `sketch` | File | 2D floor plan or hand-drawn sketch |
-| `prompt` | string | Free-text design description |
-| `style` | string | Kitchen style (e.g. "Minimalist") |
-| `dimensions` | string (JSON) | `{"width":4.2,"depth":3.1,"height":2.6}` |
-| `materials` | string (JSON) | `{"description":"matte lacquer, marble..."}` |
+- room shell and openings
+- kitchen modules and worktops
+- materials
+- camera match
 
-**Response:**
-```json
-{
-  "id": "render_abc123",
-  "status": "processing",
-  "pollUrl": "https://your-n8n/webhook/bpcuisines-render/status?id=render_abc123"
-}
-```
+The scene is compiled deterministically, previewed in three.js, then rendered through Blender using:
 
-If the render finishes synchronously, include `"status": "succeeded"` and `"outputUrl": "https://..."`.
+- `lib/server/blender.ts`
+- `scripts/blender/render_scene.py`
 
----
+Generated local outputs live under:
 
-### `GET /webhook/bpcuisines-render/status?id=<id>`
+- `.data/studio/projects/...`
+- `.data/studio/blender-packages/...`
+- `.data/studio/blender-renders/...`
 
-Returns the current status of a render job.
-
-**Response:**
-```json
-{
-  "id": "render_abc123",
-  "status": "succeeded",
-  "outputUrl": "https://..."
-}
-```
-
-| `status` value | Meaning |
-|---|---|
-| `processing` | AI render in progress |
-| `succeeded` | Render complete, `outputUrl` is set |
-| `failed` | Render failed, optional `error` string |
-
----
-
-## Polling Behaviour
-
-- Polls every **4 seconds** during normal operation
-- After **3 minutes**, switches to **10-second** slow-poll with a warning banner
-- User can cancel at any time
-- Stops automatically on `succeeded` or `failed`
-- Retries up to 3 consecutive network errors with exponential backoff before failing
-
----
-
-## Features
-
-- Drag-and-drop upload (room photo + 2D sketch)
-- Camera capture on mobile (`capture="environment"`)
-- Design prompt, style selector, room dimensions, materials fields
-- Real-time 3-step progress indicator
-- Fullscreen result preview
-- One-click 4K download
-- "Regenerate with adjustments" flow
-- Render history (last 10 jobs, persisted in `localStorage`)
-
----
-
-## How to Verify Front-Back Connection
-
-Use the **Dev — Connection Debug** panel (visible only in `npm run dev`, hidden in production) to confirm end-to-end wiring before a real shoot.
-
-### Steps
-
-1. **Start the dev server**
-   ```bash
-   npm run dev
-   # open http://localhost:3000
-   ```
-
-2. **Verify the base URL**
-   Scroll to the bottom of the page and expand the amber "Dev — Connection Debug" panel.
-   The **n8n Base URL** row should show your instance origin (e.g. `https://my-n8n.example.com`).
-   If it shows `(not set)`, create `.env.local` from `.env.local.example` and restart.
-
-3. **Ping an existing render ID**
-   In the **Ping Status** row, enter any ID that exists in your n8n Executions log and click **Ping Status**.
-   Expected response shape:
-   ```json
-   { "_http": 200, "id": "...", "status": "succeeded", "outputUrl": "https://..." }
-   ```
-   A `_http: 404` or `_error` means the webhook path or n8n activation is wrong.
-
-4. **Start Test Job**
-   Upload both images and fill in at least the prompt, then click **Start Test Job**.
-   The raw JSON from `/start` is printed immediately — look for `id` and `status`.
-   Check the **n8n → Executions** tab to confirm the workflow was triggered and all six fields arrived (`room`, `sketch`, `prompt`, `style`, `dimensions`, `materials`).
-
-5. **Full round-trip**
-   Use the normal Generate button. The progress bar will appear, and the result image will be displayed once `outputUrl` is returned.
-
----
-
-## Project Structure
-
-```
-├── app/
-│   ├── globals.css          # Tailwind v4 theme + custom animations
-│   ├── layout.tsx           # Root layout with Geist font
-│   └── page.tsx             # Dashboard — all state logic
-├── components/
-│   ├── Header.tsx           # Dark branded header
-│   ├── UploadZone.tsx       # Drag-and-drop image uploader
-│   ├── MaterialsForm.tsx    # Style / materials / constraints form
-│   ├── ProgressSection.tsx  # Step-based progress indicator
-│   ├── ResultViewer.tsx     # Image preview + download + regenerate
-│   └── HistoryPanel.tsx     # Scrollable history of past renders
-├── lib/
-│   ├── api.ts               # startRender() + pollRender()
-│   └── history.ts           # localStorage read/write helpers
-└── types/
-    └── index.ts             # Shared TypeScript types
-```
-
----
-
-## Build for Production
+## Useful Commands
 
 ```bash
+npm test
+npm run lint
 npm run build
-npm start
 ```
+
+Studio integration helpers:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/test-studio-flow.ps1
+node --experimental-strip-types scripts/test-blender-render.ts
+```
+
+## Database And Storage
+
+For the legacy IA flow, run:
+
+- `scripts/migrate.sql`
+
+For the future server-side studio migration, run:
+
+- `scripts/studio-migrate.sql`
+
+## Notes
+
+- Blender must be installed locally for `/api/studio/projects/:id/render` to produce `final.png`
+- Without `BLENDER_PATH`, the studio API can still generate a render package JSON, but it cannot launch the final render
+- The current studio assets are functional placeholders; commercial-grade BP fidelity will require a real product and material catalog

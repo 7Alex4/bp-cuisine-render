@@ -7,7 +7,7 @@
 -- Safe to re-run (all statements are idempotent).
 -- ============================================================
 
--- 1. Create render_jobs table (if not already created by n8n/setup.sql)
+-- 1. Create render_jobs table
 -- ============================================================
 CREATE TABLE IF NOT EXISTS render_jobs (
   id                   TEXT        PRIMARY KEY,
