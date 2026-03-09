@@ -4,7 +4,7 @@ export default function Header() {
   return (
     <header className="h-20 bg-white border-b border-[#EEEEEE] sticky top-0 z-40">
       <div className="max-w-[1280px] mx-auto h-full px-6 sm:px-10 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3 shrink-0">
+        <Link href="/studio" className="flex items-center gap-3 shrink-0">
           <div className="w-10 h-10 bg-[#E30613] flex items-center justify-center rounded-sm shrink-0">
             <span className="text-white text-[11px] font-bold tracking-widest">BP</span>
           </div>
@@ -18,13 +18,13 @@ export default function Header() {
             href="/studio"
             className="rounded-full border border-[#e3d9cb] px-4 py-2 text-xs font-semibold text-[#201d1e] hover:border-[#c9b6a1]"
           >
-            Studio 3D
+            Studio principal
           </Link>
           <Link
-            href="/"
+            href="/releve-imprimable"
             className="rounded-full border border-[#e3d9cb] px-4 py-2 text-xs font-semibold text-[#201d1e] hover:border-[#c9b6a1]"
           >
-            Render IA legacy
+            Fiche terrain
           </Link>
         </nav>
 

@@ -52,3 +52,34 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .print-sheet-page {
+    min-height: auto;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-sheet-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-no-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

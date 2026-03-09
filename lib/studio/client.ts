@@ -1,6 +1,7 @@
 import type {
   BlenderRenderPackage,
   CompiledScene,
+  RevisionSource,
   StudioProjectRecord,
   StudioProjectSummary,
   StudioScene,
@@ -40,14 +41,26 @@ export async function saveStudioProjectRequest(
   id: string,
   scene: StudioScene,
   name?: string,
+  source?: RevisionSource,
 ): Promise<StudioProjectRecord> {
   const res = await fetch(`/api/studio/projects/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, scene, status: 'ready' }),
+    body: JSON.stringify({ name, scene, source }),
   })
   const body = await readJson<{ project: StudioProjectRecord }>(res)
   return body.project
+}
+
+export async function deleteStudioProjectRequest(id: string): Promise<void> {
+  const res = await fetch(`/api/studio/projects/${id}`, {
+    method: 'DELETE',
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || res.statusText)
+  }
 }
 
 export async function compileStudioProjectRequest(id: string): Promise<CompiledScene> {

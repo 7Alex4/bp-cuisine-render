@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStudioProject, saveStudioProject } from '@/lib/server/studio-repository'
-import type { StudioScene } from '@/lib/studio/schema'
+import { deleteStudioProject, getStudioProject, saveStudioProject } from '@/lib/server/studio-repository'
+import type { RevisionSource, StudioScene } from '@/lib/studio/schema'
 
 export async function GET(
   _req: NextRequest,
@@ -28,7 +28,7 @@ export async function PUT(
 ) {
   const { id } = await params
 
-  let body: { name?: string; scene?: StudioScene; status?: 'draft' | 'ready' | 'rendering' }
+  let body: { name?: string; scene?: StudioScene; source?: RevisionSource }
   try {
     body = (await req.json()) as typeof body
   } catch {
@@ -43,10 +43,27 @@ export async function PUT(
     const project = await saveStudioProject(id, {
       name: body.name,
       scene: body.scene,
-      status: body.status,
-      source: 'manual',
+      source: body.source || 'manual',
     })
     return NextResponse.json({ project })
+  } catch (error) {
+    const message = String(error)
+    return NextResponse.json(
+      { error: message },
+      { status: message.startsWith('Unknown project:') ? 404 : 500 },
+    )
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params
+
+  try {
+    await deleteStudioProject(id)
+    return new NextResponse(null, { status: 204 })
   } catch (error) {
     const message = String(error)
     return NextResponse.json(

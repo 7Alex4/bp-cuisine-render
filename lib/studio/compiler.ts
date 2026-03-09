@@ -1,4 +1,5 @@
 import { getMaterialPreset } from './catalog.ts'
+import { getAutoCamera } from './render-presets.ts'
 import type {
   CompiledCamera,
   CompiledLabel,
@@ -6,6 +7,7 @@ import type {
   CompiledScene,
   KitchenModuleSpec,
   OpeningSpec,
+  PreviewShellMode,
   StudioScene,
   Vector3,
   WallId,
@@ -15,6 +17,19 @@ import { validateStudioScene } from './schema.ts'
 const WALL_COLOR = '#ece7df'
 const OPENING_COLOR = '#6db6d9'
 const CEILING_COLOR = '#f6f3ed'
+const WALL_ORDER: WallId[] = ['north', 'east', 'south', 'west']
+const TWO_WALL_CANDIDATES: WallId[][] = [
+  ['north', 'west'],
+  ['north', 'east'],
+  ['south', 'west'],
+  ['south', 'east'],
+]
+const THREE_WALL_CANDIDATES: WallId[][] = [
+  ['north', 'east', 'west'],
+  ['north', 'south', 'west'],
+  ['north', 'east', 'south'],
+  ['east', 'south', 'west'],
+]
 
 export function compileStudioScene(scene: StudioScene): CompiledScene {
   const warnings = validateStudioScene(scene)
@@ -54,9 +69,81 @@ export function compileStudioScene(scene: StudioScene): CompiledScene {
     },
     meshes,
     labels,
-    camera: buildCamera(scene),
+    camera: getSceneCamera(scene),
     warnings,
   }
+}
+
+export function getSceneCamera(
+  scene: Pick<StudioScene, 'room' | 'cameraMatch'> & { autoCameraPreset?: StudioScene['autoCameraPreset'] },
+): CompiledCamera {
+  if (scene.cameraMatch.enabled) {
+    return {
+      position: scene.cameraMatch.position,
+      target: scene.cameraMatch.target,
+      fov: scene.cameraMatch.fov,
+    }
+  }
+
+  return getAutoCamera(scene.room, scene.autoCameraPreset ?? 'balanced')
+}
+
+export function getPreviewVisibleWalls(
+  scene: Pick<StudioScene, 'modules' | 'openings' | 'previewShellMode'>,
+): WallId[] {
+  const moduleWalls = Array.from(
+    new Set(
+      scene.modules.flatMap((moduleSpec) =>
+        moduleSpec.placement.mode === 'wall' ? [moduleSpec.placement.wall] : [],
+      ),
+    ),
+  ).sort((left, right) => WALL_ORDER.indexOf(left) - WALL_ORDER.indexOf(right))
+
+  const openingWalls = Array.from(new Set(scene.openings.map((opening) => opening.wall))).sort(
+    (left, right) => WALL_ORDER.indexOf(left) - WALL_ORDER.indexOf(right),
+  )
+
+  const mode = scene.previewShellMode
+  const targetWallCount = getPreviewTargetWallCount(mode, moduleWalls.length)
+  const candidates = targetWallCount === 3 ? THREE_WALL_CANDIDATES : TWO_WALL_CANDIDATES
+  const weights = new Map<WallId, number>(WALL_ORDER.map((wall) => [wall, 0]))
+
+  for (const wall of moduleWalls) {
+    weights.set(wall, (weights.get(wall) || 0) + 5)
+  }
+
+  if (moduleWalls.length === 0) {
+    for (const wall of openingWalls) {
+      weights.set(wall, (weights.get(wall) || 0) + 2)
+    }
+  }
+
+  const bestCandidate = candidates.reduce(
+    (best, candidate, index) => {
+      const score = candidate.reduce((total, wall) => total + (weights.get(wall) || 0), 0)
+      if (!best || score > best.score) {
+        return { candidate, score, index }
+      }
+      return best
+    },
+    null as { candidate: WallId[]; score: number; index: number } | null,
+  )
+
+  if (!bestCandidate) {
+    return targetWallCount === 3 ? THREE_WALL_CANDIDATES[0] : TWO_WALL_CANDIDATES[0]
+  }
+
+  if (bestCandidate.score === 0) {
+    return bestCandidate.candidate
+  }
+
+  return bestCandidate.candidate
+}
+
+function getPreviewTargetWallCount(mode: PreviewShellMode, moduleWallCount: number): 2 | 3 {
+  if (mode === '2-walls') return 2
+  if (mode === '3-walls') return 3
+  return moduleWallCount >= 3 ? 3 : 2
 }
 
 function buildWallMeshes(scene: StudioScene): CompiledMesh[] {
@@ -270,26 +357,6 @@ function buildLabels(scene: StudioScene): CompiledLabel[] {
     },
     ...moduleLabels,
   ]
-}
-
-function buildCamera(scene: StudioScene): CompiledCamera {
-  if (scene.cameraMatch.enabled) {
-    return {
-      position: scene.cameraMatch.position,
-      target: scene.cameraMatch.target,
-      fov: scene.cameraMatch.fov,
-    }
-  }
-
-  return {
-    position: {
-      x: scene.room.width * 0.55,
-      y: scene.room.height * 0.58,
-      z: scene.room.depth * 1.22,
-    },
-    target: { x: 0, y: scene.room.height * 0.42, z: 0 },
-    fov: 44,
-  }
 }
 
 function getModuleTransform(

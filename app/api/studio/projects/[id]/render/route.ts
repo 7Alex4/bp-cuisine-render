@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isBlenderConfigured, runBlenderRender, writeBlenderRenderPackage } from '@/lib/server/blender'
-import { getStudioProject } from '@/lib/server/studio-repository'
+import { getStudioProject, setProjectStatus } from '@/lib/server/studio-repository'
 
 export async function POST(
   _req: NextRequest,
@@ -25,7 +25,15 @@ export async function POST(
       )
     }
 
-    const result = await runBlenderRender(project)
+    await setProjectStatus(id, 'rendering')
+    let result
+    try {
+      result = await runBlenderRender(project)
+    } catch (renderError) {
+      await setProjectStatus(id, 'draft').catch(() => {})
+      throw renderError
+    }
+    await setProjectStatus(id, 'ready')
     return NextResponse.json({
       packagePath: result.packagePath,
       outputDir: result.outputDir,

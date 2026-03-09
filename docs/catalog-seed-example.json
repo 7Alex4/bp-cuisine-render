@@ -1,0 +1,361 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-07T00:00:00.000Z",
+  "families": [
+    {
+      "id": "base",
+      "label": "Meubles bas",
+      "kind": "base",
+      "templates": [
+        {
+          "id": "base-40",
+          "sku": "BP-B-040",
+          "label": "Meuble bas 40 cm",
+          "kind": "base",
+          "defaultWidth": 0.40,
+          "defaultDepth": 0.60,
+          "defaultHeight": 0.72,
+          "widths": [0.40],
+          "allowsAppliance": false,
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["portes"]
+        },
+        {
+          "id": "base-60",
+          "sku": "BP-B-060",
+          "label": "Meuble bas 60 cm",
+          "kind": "base",
+          "defaultWidth": 0.60,
+          "defaultDepth": 0.60,
+          "defaultHeight": 0.72,
+          "widths": [0.50, 0.60],
+          "allowsAppliance": false,
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["portes", "tiroirs"]
+        },
+        {
+          "id": "base-60-sink",
+          "sku": "BP-B-060-EV",
+          "label": "Meuble bas évier 60 cm",
+          "kind": "base",
+          "defaultWidth": 0.60,
+          "defaultDepth": 0.60,
+          "defaultHeight": 0.72,
+          "widths": [0.60, 0.80, 0.90],
+          "allowsAppliance": true,
+          "applianceSlot": "sink",
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["évier", "portes"]
+        },
+        {
+          "id": "base-90",
+          "sku": "BP-B-090",
+          "label": "Meuble bas 90 cm",
+          "kind": "base",
+          "defaultWidth": 0.90,
+          "defaultDepth": 0.60,
+          "defaultHeight": 0.72,
+          "widths": [0.80, 0.90, 1.00],
+          "allowsAppliance": false,
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["tiroirs"]
+        }
+      ]
+    },
+    {
+      "id": "tall",
+      "label": "Colonnes",
+      "kind": "tall",
+      "templates": [
+        {
+          "id": "tall-60-oven",
+          "sku": "BP-T-060-OV",
+          "label": "Colonne four encastré 60 cm",
+          "kind": "tall",
+          "defaultWidth": 0.60,
+          "defaultDepth": 0.60,
+          "defaultHeight": 2.15,
+          "widths": [0.60],
+          "allowsAppliance": true,
+          "applianceSlot": "oven",
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["four", "colonne"]
+        },
+        {
+          "id": "tall-60-fridge",
+          "sku": "BP-T-060-FR",
+          "label": "Colonne réfrigérateur 60 cm",
+          "kind": "tall",
+          "defaultWidth": 0.60,
+          "defaultDepth": 0.60,
+          "defaultHeight": 2.15,
+          "widths": [0.60],
+          "allowsAppliance": true,
+          "applianceSlot": "fridge",
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["réfrigérateur", "colonne"]
+        }
+      ]
+    },
+    {
+      "id": "wall",
+      "label": "Meubles hauts",
+      "kind": "wall",
+      "templates": [
+        {
+          "id": "wall-60",
+          "sku": "BP-W-060",
+          "label": "Meuble haut 60 cm",
+          "kind": "wall",
+          "defaultWidth": 0.60,
+          "defaultDepth": 0.33,
+          "defaultHeight": 0.72,
+          "widths": [0.40, 0.50, 0.60, 0.80],
+          "allowsAppliance": false,
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["portes"]
+        }
+      ]
+    },
+    {
+      "id": "island",
+      "label": "Îlots",
+      "kind": "island",
+      "templates": [
+        {
+          "id": "island-120",
+          "sku": "BP-I-120",
+          "label": "Îlot 120 cm",
+          "kind": "island",
+          "defaultWidth": 1.20,
+          "defaultDepth": 0.90,
+          "defaultHeight": 0.90,
+          "widths": [1.00, 1.20, 1.50, 1.80],
+          "allowsAppliance": false,
+          "compatibleFinishFamilies": ["essentielle", "signature"],
+          "tags": ["îlot", "plan-de-travail"]
+        }
+      ]
+    }
+  ],
+  "finishes": {
+    "fronts": [
+      {
+        "id": "blanc-pur-mat",
+        "label": "Blanc pur mat",
+        "color": "#F5F0EB",
+        "material": "mat",
+        "collectionId": "essentielle",
+        "available": true
+      },
+      {
+        "id": "gris-ciment-mat",
+        "label": "Gris ciment mat",
+        "color": "#8A8880",
+        "material": "mat",
+        "collectionId": "essentielle",
+        "available": true
+      },
+      {
+        "id": "noir-profond-mat",
+        "label": "Noir profond mat",
+        "color": "#201D1E",
+        "material": "mat",
+        "collectionId": "essentielle",
+        "available": true
+      },
+      {
+        "id": "chene-naturel",
+        "label": "Chêne naturel",
+        "color": "#C4A882",
+        "material": "bois",
+        "collectionId": "signature",
+        "available": true
+      },
+      {
+        "id": "vert-sauge-satine",
+        "label": "Vert sauge satiné",
+        "color": "#7D9B76",
+        "material": "satiné",
+        "collectionId": "signature",
+        "available": true
+      }
+    ],
+    "worktops": [
+      {
+        "id": "quartz-blanc-veine",
+        "label": "Quartz blanc veiné",
+        "color": "#F0ECE4",
+        "material": "quartz",
+        "thickness": 0.038,
+        "available": true
+      },
+      {
+        "id": "stratifie-beton-gris",
+        "label": "Stratifié béton gris",
+        "color": "#888480",
+        "material": "stratifié",
+        "thickness": 0.038,
+        "available": true
+      },
+      {
+        "id": "inox-brosse",
+        "label": "Inox brossé",
+        "color": "#B0AEAA",
+        "material": "inox",
+        "thickness": 0.030,
+        "available": true
+      },
+      {
+        "id": "chene-massif-huile",
+        "label": "Chêne massif huilé",
+        "color": "#BF9B6A",
+        "material": "bois",
+        "thickness": 0.040,
+        "available": true
+      }
+    ],
+    "splashbacks": [
+      {
+        "id": "metro-blanc",
+        "label": "Carrelage métro blanc",
+        "color": "#F8F6F2",
+        "material": "carrelage",
+        "available": true
+      },
+      {
+        "id": "verre-laque-blanc",
+        "label": "Verre laqué blanc",
+        "color": "#FFFFFF",
+        "material": "verre",
+        "available": true
+      },
+      {
+        "id": "inox-brosse-cred",
+        "label": "Inox brossé crédence",
+        "color": "#B0AEAA",
+        "material": "inox",
+        "available": true
+      }
+    ],
+    "handles": [
+      {
+        "id": "barre-inox-128",
+        "label": "Barre inox 128 mm",
+        "kind": "barre",
+        "finish": "inox",
+        "available": true
+      },
+      {
+        "id": "barre-noir-mat-128",
+        "label": "Barre noir mat 128 mm",
+        "kind": "barre",
+        "finish": "noir-mat",
+        "available": true
+      },
+      {
+        "id": "push-to-open",
+        "label": "Sans poignée (push-to-open)",
+        "kind": "sans-poignée",
+        "finish": "chrome",
+        "available": true
+      },
+      {
+        "id": "bouton-rond-laiton",
+        "label": "Bouton rond laiton",
+        "kind": "bouton",
+        "finish": "doré",
+        "available": true
+      }
+    ]
+  },
+  "appliances": [
+    {
+      "id": "evier-1bac-60-inox",
+      "type": "sink",
+      "label": "Évier 1 bac 60 cm inox",
+      "sku": "EV-1B-060-INX",
+      "brand": "Generique",
+      "width": 0.56,
+      "depth": 0.50,
+      "height": 0.19,
+      "finish": "inox",
+      "requiresSlot": "sink",
+      "available": true
+    },
+    {
+      "id": "plaque-induction-60",
+      "type": "hob",
+      "label": "Plaque induction 60 cm",
+      "sku": "PL-IND-060",
+      "brand": "Generique",
+      "width": 0.59,
+      "depth": 0.52,
+      "height": 0.05,
+      "finish": "inox",
+      "requiresSlot": "hob",
+      "available": true
+    },
+    {
+      "id": "four-encastre-60",
+      "type": "oven",
+      "label": "Four encastré 60 cm inox",
+      "sku": "FO-60-INX",
+      "brand": "Generique",
+      "width": 0.60,
+      "depth": 0.55,
+      "height": 0.60,
+      "finish": "inox",
+      "requiresSlot": "oven",
+      "available": true
+    },
+    {
+      "id": "refrigerateur-integre-60",
+      "type": "fridge",
+      "label": "Réfrigérateur intégré 60 cm",
+      "sku": "FR-INT-060",
+      "brand": "Generique",
+      "width": 0.60,
+      "depth": 0.55,
+      "height": 1.77,
+      "finish": "blanc",
+      "requiresSlot": "fridge",
+      "available": true
+    },
+    {
+      "id": "lave-vaisselle-integre-60",
+      "type": "dishwasher",
+      "label": "Lave-vaisselle intégré 60 cm",
+      "sku": "LV-INT-060",
+      "brand": "Generique",
+      "width": 0.60,
+      "depth": 0.55,
+      "height": 0.82,
+      "finish": "blanc",
+      "requiresSlot": "dishwasher",
+      "available": true
+    }
+  ],
+  "compatibilities": [
+    {
+      "id": "bois-excl-inox-worktop",
+      "kind": "finish-family",
+      "description": "La façade bois est incompatible avec un plan de travail inox",
+      "sourceType": "fronts",
+      "sourceId": "chene-naturel",
+      "targetType": "worktop",
+      "targetIds": ["inox-brosse"],
+      "mode": "exclude"
+    },
+    {
+      "id": "sink-slot-required",
+      "kind": "appliance-slot",
+      "description": "L'évier nécessite un meuble bas évier",
+      "sourceType": "appliance",
+      "sourceId": "evier-1bac-60-inox",
+      "targetType": "template",
+      "targetIds": ["base-60-sink"],
+      "mode": "require"
+    }
+  ]
+}

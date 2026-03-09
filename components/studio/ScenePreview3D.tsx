@@ -2,21 +2,30 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import type { CompiledScene } from '@/lib/studio/schema'
+import { getPreviewVisibleWalls } from '@/lib/studio/compiler'
+import { getRenderAmbienceSettings } from '@/lib/studio/render-presets'
+import type { CompiledScene, StudioScene, WallId } from '@/lib/studio/schema'
 
 interface Props {
   compiled: CompiledScene
+  scene: StudioScene
 }
 
-export default function ScenePreview3D({ compiled }: Props) {
+function getWallFromMeshId(meshId: string): WallId | null {
+  const match = meshId.match(/^wall-(north|east|south|west)(?:-|$)/)
+  return (match?.[1] as WallId | undefined) || null
+}
+
+export default function ScenePreview3D({ compiled, scene: sourceScene }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
+    const ambience = getRenderAmbienceSettings(sourceScene.renderAmbiencePreset)
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#f8f5f0')
+    scene.background = new THREE.Color(ambience.previewBackgroundColor)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.shadowMap.enabled = true
@@ -43,15 +52,37 @@ export default function ScenePreview3D({ compiled }: Props) {
     )
     camera.lookAt(target)
 
-    const ambient = new THREE.AmbientLight('#ffffff', 1.2)
+    const ambient = new THREE.AmbientLight('#ffffff', ambience.ambientIntensity)
     scene.add(ambient)
 
-    const sun = new THREE.DirectionalLight('#fff9f0', 2.2)
+    const sun = new THREE.DirectionalLight(ambience.sunColor, ambience.sunIntensity)
     sun.position.set(4.2, 6.5, 3.8)
     sun.castShadow = true
     scene.add(sun)
 
+    const visibleWalls = new Set(getPreviewVisibleWalls(sourceScene))
+    const openingWalls = new Map(sourceScene.openings.map((opening) => [opening.id, opening.wall]))
+
     for (const mesh of compiled.meshes) {
+      if (mesh.kind === 'ceiling') {
+        continue
+      }
+
+      if (mesh.kind === 'wall') {
+        const wall = getWallFromMeshId(mesh.id)
+        if (wall && !visibleWalls.has(wall)) {
+          continue
+        }
+      }
+
+      if (mesh.kind === 'opening') {
+        const openingId = mesh.id.replace(/^opening-/, '')
+        const wall = openingWalls.get(openingId)
+        if (wall && !visibleWalls.has(wall)) {
+          continue
+        }
+      }
+
       const geometry = new THREE.BoxGeometry(mesh.size.x, mesh.size.y, mesh.size.z)
       const material = new THREE.MeshStandardMaterial({
         color: mesh.color,
@@ -133,7 +164,7 @@ export default function ScenePreview3D({ compiled }: Props) {
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [compiled])
+  }, [compiled, sourceScene])
 
   return <div ref={containerRef} className="h-full w-full rounded-[24px] overflow-hidden" />
 }
