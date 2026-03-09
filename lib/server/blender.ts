@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { compileStudioScene } from '../studio/compiler.ts'
+import { getAutoCamera } from '../studio/render-presets.ts'
 import { getRenderAmbienceSettings, getRenderQualitySettings } from '../studio/render-presets.ts'
 import type { BlenderRenderPackage, StudioProjectRecord } from '../studio/schema.ts'
 
@@ -15,6 +16,8 @@ export function isBlenderConfigured(): boolean {
 export function buildBlenderRenderPackage(project: StudioProjectRecord): BlenderRenderPackage {
   const quality = getRenderQualitySettings(project.scene.renderQualityPreset)
   const ambience = getRenderAmbienceSettings(project.scene.renderAmbiencePreset)
+  const compiled = compileStudioScene(project.scene)
+  const secondaryPreset = project.scene.autoCameraPreset === 'wide' ? 'hero' : 'wide'
 
   return {
     version: '1.0',
@@ -25,7 +28,7 @@ export function buildBlenderRenderPackage(project: StudioProjectRecord): Blender
       latestRevisionNumber: project.latestRevisionNumber,
     },
     scene: project.scene,
-    compiled: compileStudioScene(project.scene),
+    compiled,
     renderPreset: {
       engine: 'CYCLES',
       quality: project.scene.renderQualityPreset,
@@ -36,6 +39,18 @@ export function buildBlenderRenderPackage(project: StudioProjectRecord): Blender
         format: 'PNG',
         samples: quality.samples,
       },
+      views: [
+        {
+          id: 'final',
+          fileName: 'final.png',
+          camera: compiled.camera,
+        },
+        {
+          id: secondaryPreset,
+          fileName: `${secondaryPreset}.png`,
+          camera: getAutoCamera(project.scene.room, secondaryPreset),
+        },
+      ],
       colorManagement: ambience.colorManagement,
       exposure: ambience.exposure,
       backgroundColor: ambience.backgroundColor,

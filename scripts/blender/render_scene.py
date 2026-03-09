@@ -178,14 +178,8 @@ def create_camera(bpy, camera_spec):
     camera_obj = bpy.data.objects.new("StudioCamera", camera_data)
     bpy.context.scene.collection.objects.link(camera_obj)
 
-    # Scene coords: Y up. Blender coords: Z up. Mapping: scene(x,z,y) → blender(x,y,z).
-    pos = camera_spec["position"]
-    camera_obj.location = (pos["x"], pos["z"], pos["y"])
-
     # Create an empty as the look-at target.
-    target = camera_spec["target"]
     target_empty = bpy.data.objects.new("CameraTarget", None)
-    target_empty.location = (target["x"], target["z"], target["y"])
     bpy.context.scene.collection.objects.link(target_empty)
 
     # TrackTo constraint: camera -Z looks toward target, camera +Y is world up.
@@ -194,8 +188,17 @@ def create_camera(bpy, camera_spec):
     constraint.track_axis = "TRACK_NEGATIVE_Z"
     constraint.up_axis = "UP_Y"
 
-    camera_data.angle = math.radians(camera_spec["fov"])
     bpy.context.scene.camera = camera_obj
+    apply_camera_view(camera_obj, target_empty, camera_spec)
+    return camera_obj, target_empty
+
+
+def apply_camera_view(camera_obj, target_empty, camera_spec):
+    pos = camera_spec["position"]
+    camera_obj.location = (pos["x"], pos["z"], pos["y"])
+    target = camera_spec["target"]
+    target_empty.location = (target["x"], target["z"], target["y"])
+    camera_obj.data.angle = math.radians(camera_spec["fov"])
 
 
 def point_object_at(obj, target):
@@ -332,11 +335,18 @@ def main():
     for mesh in package["compiled"]["meshes"]:
         create_box(bpy, mesh, material_cache, package["renderPreset"])
 
-    create_camera(bpy, package["compiled"]["camera"])
+    camera_obj, target_empty = create_camera(bpy, package["compiled"]["camera"])
     create_lights(bpy, package["scene"]["room"], package["renderPreset"])
     configure_render(bpy, package["renderPreset"], output_dir)
+    render_views = package.get("renderPreset", {}).get("views") or [
+        {"id": "final", "fileName": "final.png", "camera": package["compiled"]["camera"]}
+    ]
 
-    bpy.ops.render.render(write_still=True)
+    for view in render_views:
+        apply_camera_view(camera_obj, target_empty, view["camera"])
+        bpy.context.scene.render.filepath = os.path.join(output_dir, view["fileName"])
+        bpy.ops.render.render(write_still=True)
+
     print(f"Rendered package {package_path} -> {output_dir}")
 
 

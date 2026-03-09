@@ -39,24 +39,24 @@ export function getAutoCamera(
   if (preset === 'hero') {
     return {
       position: {
-        x: room.width * 0.74,
-        y: room.height * 0.6,
-        z: room.depth * 1.02,
+        x: room.width * 0.62,
+        y: room.height * 0.56,
+        z: room.depth * 0.88,
       },
-      target: { x: 0, y: room.height * 0.42, z: -room.depth * 0.04 },
-      fov: 40,
+      target: { x: 0, y: room.height * 0.41, z: -room.depth * 0.08 },
+      fov: 38,
     }
   }
 
   if (preset === 'wide') {
     return {
       position: {
-        x: room.width * 0.16,
-        y: room.height * 0.64,
-        z: room.depth * 1.72,
+        x: room.width * 0.08,
+        y: room.height * 0.62,
+        z: room.depth * 1.5,
       },
       target: { x: 0, y: room.height * 0.44, z: 0 },
-      fov: 58,
+      fov: 54,
     }
   }
 
@@ -74,12 +74,12 @@ export function getAutoCamera(
 
   return {
     position: {
-      x: room.width * 0.55,
+      x: room.width * 0.48,
       y: room.height * 0.58,
-      z: room.depth * 1.22,
+      z: room.depth * 1.08,
     },
     target: { x: 0, y: room.height * 0.42, z: 0 },
-    fov: 44,
+    fov: 42,
   }
 }
 

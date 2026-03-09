@@ -328,6 +328,11 @@ export interface BlenderRenderPackage {
     quality: RenderQualityPreset
     ambience: RenderAmbiencePreset
     output: { width: number; height: number; format: 'PNG'; samples: number }
+    views: Array<{
+      id: string
+      fileName: string
+      camera: CompiledCamera
+    }>
     colorManagement: string
     exposure: number
     backgroundColor: string
