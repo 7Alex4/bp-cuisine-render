@@ -67,7 +67,6 @@ function buildWallMeshes(scene: StudioScene): CompiledMesh[] {
     const wallLength = wall === 'north' || wall === 'south' ? scene.room.width : scene.room.depth
     const wallThickness = scene.room.wallThickness
     const isHorizontal = wall === 'north' || wall === 'south'
-    const baseRotation = isHorizontal ? 0 : Math.PI / 2
     const baseCenter = getWallCenter(scene, wall)
 
     if (openings.length === 0) {
@@ -78,7 +77,7 @@ function buildWallMeshes(scene: StudioScene): CompiledMesh[] {
         size: isHorizontal
           ? { x: wallLength, y: scene.room.height, z: wallThickness }
           : { x: wallThickness, y: scene.room.height, z: wallLength },
-        rotationY: baseRotation,
+        rotationY: 0,
         color: WALL_COLOR,
       })
       continue
@@ -182,7 +181,7 @@ function createWallStripMesh({
     size: isHorizontal
       ? { x: length, y: height, z: room.wallThickness }
       : { x: room.wallThickness, y: height, z: length },
-    rotationY: isHorizontal ? 0 : Math.PI / 2,
+    rotationY: 0,
     color: WALL_COLOR,
   }
 }
@@ -205,7 +204,7 @@ function createOpeningGuideMesh(scene: StudioScene, opening: OpeningSpec): Compi
     size: isHorizontal
       ? { x: opening.width, y: opening.height, z: scene.room.wallThickness * 1.15 }
       : { x: scene.room.wallThickness * 1.15, y: opening.height, z: opening.width },
-    rotationY: isHorizontal ? 0 : Math.PI / 2,
+    rotationY: 0,
     color: OPENING_COLOR,
     opacity: 0.35,
   }
@@ -356,16 +355,17 @@ function getModuleTransform(
 function getWallCenter(scene: StudioScene, wall: WallId): Vector3 {
   const halfWidth = scene.room.width / 2
   const halfDepth = scene.room.depth / 2
+  const halfThickness = scene.room.wallThickness / 2
 
   switch (wall) {
     case 'north':
-      return { x: 0, y: scene.room.height / 2, z: -halfDepth }
+      return { x: 0, y: scene.room.height / 2, z: -halfDepth - halfThickness }
     case 'south':
-      return { x: 0, y: scene.room.height / 2, z: halfDepth }
+      return { x: 0, y: scene.room.height / 2, z: halfDepth + halfThickness }
     case 'west':
-      return { x: -halfWidth, y: scene.room.height / 2, z: 0 }
+      return { x: -halfWidth - halfThickness, y: scene.room.height / 2, z: 0 }
     case 'east':
-      return { x: halfWidth, y: scene.room.height / 2, z: 0 }
+      return { x: halfWidth + halfThickness, y: scene.room.height / 2, z: 0 }
   }
 }
 
@@ -379,18 +379,19 @@ function getWallStripCenter(
 ): Vector3 {
   const halfWidth = room.width / 2
   const halfDepth = room.depth / 2
+  const halfThickness = room.wallThickness / 2
   const centerAxis = start + length / 2
   const centerY = bottom + (top - bottom) / 2
 
   switch (wall) {
     case 'north':
-      return { x: -halfWidth + centerAxis, y: centerY, z: -halfDepth }
+      return { x: -halfWidth + centerAxis, y: centerY, z: -halfDepth - halfThickness }
     case 'south':
-      return { x: -halfWidth + centerAxis, y: centerY, z: halfDepth }
+      return { x: -halfWidth + centerAxis, y: centerY, z: halfDepth + halfThickness }
     case 'west':
-      return { x: -halfWidth, y: centerY, z: -halfDepth + centerAxis }
+      return { x: -halfWidth - halfThickness, y: centerY, z: -halfDepth + centerAxis }
     case 'east':
-      return { x: halfWidth, y: centerY, z: -halfDepth + centerAxis }
+      return { x: halfWidth + halfThickness, y: centerY, z: -halfDepth + centerAxis }
   }
 }
 

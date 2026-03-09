@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { compileStudioScene } from '../studio/compiler.ts'
+import { getRenderAmbienceSettings, getRenderQualitySettings } from '../studio/render-presets.ts'
 import type { BlenderRenderPackage, StudioProjectRecord } from '../studio/schema.ts'
 
 const DATA_ROOT = process.env.STUDIO_DATA_DIR || path.join(process.cwd(), '.data', 'studio')
@@ -12,6 +13,9 @@ export function isBlenderConfigured(): boolean {
 }
 
 export function buildBlenderRenderPackage(project: StudioProjectRecord): BlenderRenderPackage {
+  const quality = getRenderQualitySettings(project.scene.renderQualityPreset)
+  const ambience = getRenderAmbienceSettings(project.scene.renderAmbiencePreset)
+
   return {
     version: '1.0',
     generatedAt: new Date().toISOString(),
@@ -24,13 +28,37 @@ export function buildBlenderRenderPackage(project: StudioProjectRecord): Blender
     compiled: compileStudioScene(project.scene),
     renderPreset: {
       engine: 'CYCLES',
+      quality: project.scene.renderQualityPreset,
+      ambience: project.scene.renderAmbiencePreset,
       output: {
-        width: 2400,
-        height: 1600,
+        width: quality.width,
+        height: quality.height,
         format: 'PNG',
-        samples: 256,
+        samples: quality.samples,
       },
-      colorManagement: 'Filmic',
+      colorManagement: ambience.colorManagement,
+      exposure: ambience.exposure,
+      backgroundColor: ambience.backgroundColor,
+      worldStrength: ambience.worldStrength,
+      denoise: quality.denoise,
+      adaptiveThreshold: quality.adaptiveThreshold,
+      maxBounces: quality.maxBounces,
+      diffuseBounces: quality.diffuseBounces,
+      glossyBounces: quality.glossyBounces,
+      transmissionBounces: quality.transmissionBounces,
+      filterWidth: quality.filterWidth,
+      bevelWidth: quality.bevelWidth,
+      bevelSegments: quality.bevelSegments,
+      lighting: {
+        areaEnergyMultiplier: ambience.areaEnergyMultiplier,
+        areaColor: ambience.areaColor,
+        fillEnergy: ambience.fillEnergy,
+        fillColor: ambience.fillColor,
+        rimEnergy: ambience.rimEnergy,
+        rimColor: ambience.rimColor,
+        sunEnergy: ambience.sunEnergy,
+        sunColor: ambience.sunColor,
+      },
     },
   }
 }

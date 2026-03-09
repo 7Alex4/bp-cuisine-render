@@ -3,10 +3,27 @@
 import {
   MATERIAL_PRESETS,
   MODULE_TEMPLATES,
+  QUICK_IMPLANTATION_PRESETS,
+  applyPresetEnL,
+  applyPresetEnU,
+  applyPresetLineaire,
   createModuleFromTemplate,
 } from '@/lib/studio/catalog'
+import {
+  AUTO_CAMERA_PRESET_OPTIONS,
+  RENDER_AMBIENCE_OPTIONS,
+  RENDER_QUALITY_OPTIONS,
+} from '@/lib/studio/render-presets'
+import { validateSiteSurvey } from '@/lib/studio/schema'
 import type { Dispatch, SetStateAction } from 'react'
-import type { KitchenModuleSpec, OpeningKind, OpeningSpec, StudioScene, WallId } from '@/lib/studio/schema'
+import type {
+  KitchenModuleSpec,
+  OpeningKind,
+  OpeningSpec,
+  SiteSurvey,
+  StudioScene,
+  WallId,
+} from '@/lib/studio/schema'
 
 const WALL_OPTIONS: { id: WallId; label: string }[] = [
   { id: 'north', label: 'Nord' },
@@ -18,12 +35,58 @@ const WALL_OPTIONS: { id: WallId; label: string }[] = [
 export default function StudioFormPanel({
   scene,
   setScene,
+  selectedModuleId,
+  onSelectModule,
 }: {
   scene: StudioScene
   setScene: Dispatch<SetStateAction<StudioScene | null>>
+  selectedModuleId?: string | null
+  onSelectModule?: (moduleId: string | null) => void
 }) {
+  function withSurveyOpenings(
+    current: StudioScene,
+    openings: OpeningSpec[],
+  ): StudioScene {
+    const nextSurvey: SiteSurvey = {
+      ...current.siteSurvey,
+      openings: openings.map((opening) => ({
+        id: opening.id,
+        name: opening.name,
+        wall: opening.wall,
+        kind: opening.kind,
+        offset: opening.offset,
+        width: opening.width,
+        height: opening.height,
+        baseHeight: opening.baseHeight,
+      })),
+    }
+    const validation = validateSiteSurvey(nextSurvey)
+    return {
+      ...current,
+      openings,
+      siteSurvey: { ...nextSurvey, completeness: validation.completeness },
+    }
+  }
+
   function updateRoom<K extends keyof StudioScene['room']>(key: K, value: number) {
-    setScene((current) => (current ? { ...current, room: { ...current.room, [key]: value } } : current))
+    setScene((current) => {
+      if (!current) return current
+      const nextRoom = { ...current.room, [key]: value }
+      const nextSurvey: SiteSurvey = {
+        ...current.siteSurvey,
+        dimensions: {
+          width: nextRoom.width,
+          depth: nextRoom.depth,
+          height: nextRoom.height,
+        },
+      }
+      const validation = validateSiteSurvey(nextSurvey)
+      return {
+        ...current,
+        room: nextRoom,
+        siteSurvey: { ...nextSurvey, completeness: validation.completeness },
+      }
+    })
   }
 
   function updateMaterial<K extends keyof StudioScene['materials']>(key: K, value: string) {
@@ -55,6 +118,13 @@ export default function StudioFormPanel({
     )
   }
 
+  function updateScenePreset<K extends 'autoCameraPreset' | 'renderAmbiencePreset' | 'renderQualityPreset'>(
+    key: K,
+    value: StudioScene[K],
+  ) {
+    setScene((current) => (current ? { ...current, [key]: value } : current))
+  }
+
   function addOpening(kind: OpeningKind) {
     const opening: OpeningSpec = {
       id: crypto.randomUUID(),
@@ -66,37 +136,67 @@ export default function StudioFormPanel({
       height: kind === 'door' ? 2.05 : 1.2,
       baseHeight: kind === 'door' ? 0 : 0.95,
     }
-    setScene((current) => (current ? { ...current, openings: [...current.openings, opening] } : current))
+    setScene((current) =>
+      current ? withSurveyOpenings(current, [...current.openings, opening]) : current,
+    )
   }
 
   function updateOpening(id: string, patch: Partial<OpeningSpec>) {
     setScene((current) =>
       current
-        ? {
-            ...current,
-            openings: current.openings.map((opening) =>
+        ? withSurveyOpenings(
+            current,
+            current.openings.map((opening) =>
               opening.id === id ? { ...opening, ...patch } : opening,
             ),
-          }
+          )
         : current,
     )
   }
 
   function removeOpening(id: string) {
     setScene((current) =>
-      current ? { ...current, openings: current.openings.filter((opening) => opening.id !== id) } : current,
+      current
+        ? withSurveyOpenings(
+            current,
+            current.openings.filter((opening) => opening.id !== id),
+          )
+        : current,
     )
   }
 
   function addModule(templateId: string) {
+    const nextId = crypto.randomUUID()
     setScene((current) =>
       current
         ? {
             ...current,
-            modules: [...current.modules, createModuleFromTemplate(templateId, current.modules.length)],
+            modules: [
+              ...current.modules,
+              createModuleFromTemplate(templateId, current.modules.length, { id: nextId }),
+            ],
           }
         : current,
     )
+    onSelectModule?.(nextId)
+  }
+
+  function applyImplantationPreset(presetId: 'lineaire' | 'en-l' | 'en-u') {
+    setScene((current) => {
+      if (!current) return current
+
+      if (current.modules.length > 0) {
+        const confirmed = window.confirm(
+          'Remplacer les modules actuels par une implantation rapide ?',
+        )
+        if (!confirmed) return current
+      }
+
+      onSelectModule?.(null)
+      if (presetId === 'lineaire') return applyPresetLineaire(current)
+      if (presetId === 'en-l') return applyPresetEnL(current)
+      return applyPresetEnU(current)
+    })
   }
 
   function updateModule(id: string, patch: Partial<KitchenModuleSpec>) {
@@ -167,6 +267,9 @@ export default function StudioFormPanel({
         ? { ...current, modules: current.modules.filter((moduleSpec) => moduleSpec.id !== id) }
         : current,
     )
+    if (selectedModuleId === id) {
+      onSelectModule?.(null)
+    }
   }
 
   return (
@@ -228,6 +331,42 @@ export default function StudioFormPanel({
 
       <div className="space-y-6">
         <Card title="Catalogue BP et implantation" subtitle="Modules parametrables">
+          <div className="mb-5 rounded-[20px] border border-[#ebe1d5] bg-[#faf7f2] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[#201d1e]">Demarrage express</h3>
+                <p className="mt-1 max-w-[520px] text-sm text-[#6f6863]">
+                  Pose une base credible en 1 clic, puis ajuste ensuite les dimensions ou modules.
+                </p>
+              </div>
+              {scene.modules.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setScene((current) => (current ? { ...current, modules: [], previewShellMode: 'auto' } : current))
+                  }
+                  className="rounded-full border border-[#d8ccbc] bg-white px-4 py-2 text-xs font-semibold text-[#201d1e]"
+                >
+                  Vider l implantation
+                </button>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              {QUICK_IMPLANTATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => applyImplantationPreset(preset.id)}
+                  className="rounded-[18px] border border-[#e0d4c4] bg-white p-4 text-left transition-colors hover:border-[#b6a593]"
+                >
+                  <div className="text-sm font-semibold text-[#201d1e]">{preset.label}</div>
+                  <div className="mt-1 text-sm text-[#6f6863]">{preset.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2 mb-5">
             {MODULE_TEMPLATES.map((template) => (
               <button
@@ -242,14 +381,30 @@ export default function StudioFormPanel({
 
           <div className="space-y-3">
             {scene.modules.map((moduleSpec) => (
-              <div key={moduleSpec.id} className="rounded-[20px] border border-[#ebe1d5] bg-[#faf7f2] p-4 space-y-3">
+              <div
+                key={moduleSpec.id}
+                onClick={() => onSelectModule?.(moduleSpec.id)}
+                className={[
+                  'rounded-[20px] border p-4 space-y-3 transition-colors cursor-pointer',
+                  selectedModuleId === moduleSpec.id
+                    ? 'border-[#d1a96e] bg-[#fffaf2] shadow-[0_0_0_2px_rgba(209,169,110,0.12)]'
+                    : 'border-[#ebe1d5] bg-[#faf7f2]',
+                ].join(' ')}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <input
                     value={moduleSpec.label}
+                    onFocus={() => onSelectModule?.(moduleSpec.id)}
                     onChange={(event) => updateModule(moduleSpec.id, { label: event.target.value })}
                     className="w-full rounded-[12px] border border-[#e1d4c4] bg-white px-3 py-2 text-sm"
                   />
-                  <button onClick={() => removeModule(moduleSpec.id)} className="text-xs text-[#9b5143] font-semibold">
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      removeModule(moduleSpec.id)
+                    }}
+                    className="text-xs text-[#9b5143] font-semibold"
+                  >
                     Supprimer
                   </button>
                 </div>
@@ -260,6 +415,12 @@ export default function StudioFormPanel({
                   <NumberField label="Hauteur" value={moduleSpec.height} onChange={(value) => updateModule(moduleSpec.id, { height: value })} />
                   <NumberField label="Elevation" value={moduleSpec.elevation} onChange={(value) => updateModule(moduleSpec.id, { elevation: value })} />
                 </div>
+
+                {selectedModuleId === moduleSpec.id ? (
+                  <div className="rounded-[14px] border border-[#e7cfab] bg-white px-3 py-2 text-xs font-semibold text-[#7c5f38]">
+                    Selection synchronisee avec le plan 2D
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <SelectField
@@ -331,26 +492,68 @@ export default function StudioFormPanel({
             />
           </div>
 
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <SelectField
+              label="Camera auto"
+              value={scene.autoCameraPreset}
+              onChange={(value) => updateScenePreset('autoCameraPreset', value as StudioScene['autoCameraPreset'])}
+              options={AUTO_CAMERA_PRESET_OPTIONS.map((preset) => ({
+                id: preset.id,
+                label: preset.label,
+              }))}
+            />
+            <SelectField
+              label="Ambiance rendu"
+              value={scene.renderAmbiencePreset}
+              onChange={(value) =>
+                updateScenePreset('renderAmbiencePreset', value as StudioScene['renderAmbiencePreset'])
+              }
+              options={RENDER_AMBIENCE_OPTIONS.map((preset) => ({
+                id: preset.id,
+                label: preset.label,
+              }))}
+            />
+            <SelectField
+              label="Qualite rendu"
+              value={scene.renderQualityPreset}
+              onChange={(value) =>
+                updateScenePreset('renderQualityPreset', value as StudioScene['renderQualityPreset'])
+              }
+              options={RENDER_QUALITY_OPTIONS.map((preset) => ({
+                id: preset.id,
+                label: preset.label,
+              }))}
+            />
+          </div>
+
           <div className="mt-5 rounded-[20px] border border-[#ebe1d5] bg-[#faf7f2] p-4 space-y-3">
             <label className="flex items-center gap-3 text-sm font-medium text-[#201d1e]">
               <input type="checkbox" checked={scene.cameraMatch.enabled} onChange={(event) => updateCameraNumber('enabled', event.target.checked)} />
               Activer camera match photo
             </label>
 
-            <div className="grid grid-cols-3 gap-3">
-              <NumberField label="Cam X" value={scene.cameraMatch.position.x} onChange={(value) => updateCameraVector('position', 'x', value)} />
-              <NumberField label="Cam Y" value={scene.cameraMatch.position.y} onChange={(value) => updateCameraVector('position', 'y', value)} />
-              <NumberField label="Cam Z" value={scene.cameraMatch.position.z} onChange={(value) => updateCameraVector('position', 'z', value)} />
-              <NumberField label="Target X" value={scene.cameraMatch.target.x} onChange={(value) => updateCameraVector('target', 'x', value)} />
-              <NumberField label="Target Y" value={scene.cameraMatch.target.y} onChange={(value) => updateCameraVector('target', 'y', value)} />
-              <NumberField label="Target Z" value={scene.cameraMatch.target.z} onChange={(value) => updateCameraVector('target', 'z', value)} />
-            </div>
+            {scene.cameraMatch.enabled ? (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <NumberField label="Cam X" value={scene.cameraMatch.position.x} onChange={(value) => updateCameraVector('position', 'x', value)} />
+                  <NumberField label="Cam Y" value={scene.cameraMatch.position.y} onChange={(value) => updateCameraVector('position', 'y', value)} />
+                  <NumberField label="Cam Z" value={scene.cameraMatch.position.z} onChange={(value) => updateCameraVector('position', 'z', value)} />
+                  <NumberField label="Target X" value={scene.cameraMatch.target.x} onChange={(value) => updateCameraVector('target', 'x', value)} />
+                  <NumberField label="Target Y" value={scene.cameraMatch.target.y} onChange={(value) => updateCameraVector('target', 'y', value)} />
+                  <NumberField label="Target Z" value={scene.cameraMatch.target.z} onChange={(value) => updateCameraVector('target', 'z', value)} />
+                </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <NumberField label="FOV" value={scene.cameraMatch.fov} onChange={(value) => updateCameraNumber('fov', value)} step={1} />
-              <NumberField label="Lens shift X" value={scene.cameraMatch.lensShiftX} onChange={(value) => updateCameraNumber('lensShiftX', value)} step={0.01} />
-              <NumberField label="Lens shift Y" value={scene.cameraMatch.lensShiftY} onChange={(value) => updateCameraNumber('lensShiftY', value)} step={0.01} />
-            </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <NumberField label="FOV" value={scene.cameraMatch.fov} onChange={(value) => updateCameraNumber('fov', value)} step={1} />
+                  <NumberField label="Lens shift X" value={scene.cameraMatch.lensShiftX} onChange={(value) => updateCameraNumber('lensShiftX', value)} step={0.01} />
+                  <NumberField label="Lens shift Y" value={scene.cameraMatch.lensShiftY} onChange={(value) => updateCameraNumber('lensShiftY', value)} step={0.01} />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-[#6f6863]">
+                Laissez desactive pour garder la camera automatique rapide. Activez-le seulement pour un calage photo manuel.
+              </p>
+            )}
           </div>
         </Card>
       </div>
